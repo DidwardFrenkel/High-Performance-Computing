@@ -76,7 +76,6 @@ int main(int argc,char* argv[])
   }
   double h = 1.0/(dim+1);
 
-
     //start time
     gettimeofday(&t1,NULL);
 
@@ -134,7 +133,6 @@ int main(int argc,char* argv[])
         destination = nprocs == 1 ? 0:1;
         origin = nprocs - 1;
         ui[divlength+1] = u[start+divlength];
-        jacobi(un,ui,f,start,divlength,dim);
         prev_endpoint = ui[divlength];
         MPI_Send(&prev_endpoint,1,MPI_DOUBLE,destination,tag,MPI_COMM_WORLD);
 	//receive immediately in case we only have one interval. Serves no other purpose.
@@ -142,18 +140,17 @@ int main(int argc,char* argv[])
       } else if (end == dim - 1) {
         MPI_Recv(&next_endpoint,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpoint;
-        jacobi(un,ui,f,start,divlength,dim);
         prev_endpoint = 0;
         MPI_Send(&prev_endpoint,1,MPI_DOUBLE,0,tag,MPI_COMM_WORLD);
       } else {
         MPI_Recv(&next_endpoint,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpoint;
         ui[divlength+1] = u[start+divlength];
-        jacobi(un,ui,f,start,divlength,dim);
         prev_endpoint = ui[divlength];
         MPI_Send(&prev_endpoint,1,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD);
       }
 
+      jacobi(un,ui,f,start,divlength,dim);
       //prod(p,un,start,divlength,dim);		//p = h^2*Au
       //for(i=0;i<divlength;i++) d[i] = p[i] - f;	//d = p - h^2f
 
@@ -162,9 +159,13 @@ int main(int argc,char* argv[])
       for (i = 0;i<divlength;i++){
         u[start+i] = un[i+1];
       }
-      if (rank == nprocs - 1) {
-        int j;
-        for (j = 0;j<dim;j++) printf("%d ",u[j]);
+
+      //print vector to check
+      if (rank == nprocs -1) {
+        int k;
+        for (k = 0;k<dim;k++){
+          printf("%lf ",u[k]);
+        }
         printf("\n");
       }
       //double message_in,sum;
