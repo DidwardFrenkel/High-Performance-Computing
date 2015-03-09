@@ -56,33 +56,31 @@ int main(int argc,char* argv[])
   struct timeval t1,t2;
   //dimension of matrix and vector. Matrix is square matrix
   
-  unsigned int dim,iter; //number of iterations
-  if (argc == 1) {
-    /*Default value for dim:
-      minimum case where the start point does not equal the endpoint
-      but since this is a very imprecise partition, this is highly
-      undesirable.*/
-    printf("No partition amount specified. Partitioning into 2 intervals.\n");
-    printf("No iteration amount specified. Jacobi algorithm will iterate 10 times.\n");
-    dim = 2;
-    iter = 10;
-  } else if (argc == 2) {
-    printf("No iteration amount specified. Jacobi algorithm will iterate 10 times.\n");
-    dim = atoi(argv[1]);
-    iter = 10;
-  }else {
-    dim = atoi(argv[1]);
-    iter = atoi(argv[2]);
-  }
-  double h = 1.0/(dim+1);
-
     //start time
     gettimeofday(&t1,NULL);
-
     MPI_Status status;
 
-    //function f is 1
-    double f = h*h;
+      unsigned int dim,iter; //number of iterations
+      if (argc == 1) {
+        /*Default value for dim:
+         minimum case where the start point does not equal the endpoint
+         but since this is a very imprecise partition, this is highly
+         undesirable.*/
+        printf("No partition amount specified. Partitioning into 2 intervals.\n");
+        printf("No iteration amount specified. Jacobi algorithm will iterate 10 times.\n");
+        dim = 2;
+        iter = 10;
+      } else if (argc == 2) {
+        printf("No iteration amount specified. Jacobi algorithm will iterate 10 times.\n");
+        dim = atoi(argv[1]);
+        iter = 10;
+      } else {
+        dim = atoi(argv[1]);
+        iter = atoi(argv[2]);
+      }
+
+    double h = 1.0/(dim+1);
+    double f = h*h; //function f is 1
 
     int nprocs,rank;
     unsigned int start,end;
@@ -140,8 +138,7 @@ int main(int argc,char* argv[])
       } else if (end == dim - 1) {
         MPI_Recv(&next_endpoint,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpoint;
-        prev_endpoint = 0;
-        MPI_Send(&prev_endpoint,1,MPI_DOUBLE,0,tag,MPI_COMM_WORLD);
+        MPI_Send(&prev_endpoint,1,MPI_DOUBLE,0,tag,MPI_COMM_WORLD); //send something back to receive at rank 0
       } else {
         MPI_Recv(&next_endpoint,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpoint;
