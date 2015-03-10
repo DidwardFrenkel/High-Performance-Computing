@@ -152,6 +152,7 @@ int main(int argc,char* argv[]) {
         printf("Iter: %d\n",j);
         for (k = 0;k<dim;k++) printf("%lf ",u[k]);
         printf("\n");
+
         for (k = 0;k<dim;k++) prev_u[k] = u[k];
         MPI_Send(prev_u,dim,MPI_DOUBLE,0,tag,MPI_COMM_WORLD); //send something back to receive at rank 0
       } else {
@@ -160,6 +161,10 @@ int main(int argc,char* argv[]) {
         ui[0] = u[start - 1];
         ui[divlength+1] = u[start+divlength];
         jacobi(uin,ui,f,start,divlength,dim);
+	//PRINT DEBUG
+        for (i = 0;i<divlength;i++) printf("%lf ", uin[i+1]);
+	printf("\n");
+
         for (i = 0;i<start;i++) un[i] = next_u[i];
         for (i = 0;i<divlength;i++) un[start+i] = uin[i+1];
         for (k = 0;k<dim;k++) prev_u[k] = un[k];
@@ -194,7 +199,7 @@ int main(int argc,char* argv[]) {
     if (rank == nprocs - 1) {
       gettimeofday(&t2,NULL);
 
-      printf("Time elapsed: %lf sec.\n", (double)(t2.tv_usec-t1.tv_usec)/1000000 + (double)(t2.tv_sec - t1.tv_sec));
+      printf("Time elapsed: %lf sec.\n", ((double)(t2.tv_usec-t1.tv_usec)/1000000 + (double)(t2.tv_sec - t1.tv_sec)));
     }
 
   return 0;
