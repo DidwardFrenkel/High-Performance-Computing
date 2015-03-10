@@ -33,7 +33,7 @@ void prod(double* p, double* u,unsigned int start, int divlength, unsigned int d
 
 void jacobi(double* u_new, double* u, double h2,unsigned int start,int divlength,unsigned int dim)
 {
-  unsigned int i;
+  int i;
   for (i = 0;i<divlength;i++)
   {
     double msum;
@@ -41,14 +41,13 @@ void jacobi(double* u_new, double* u, double h2,unsigned int start,int divlength
       h^2A is sparse, enabling it to be reduced to a simple if statement
       for every step */ 
     if (start+i == 0) msum = -u[1];
-    else if (start+i == dim -1) msum = -u[dim-2];
+    else if (start+i == dim -1) msum = -u[divlength-1];
     else msum= -u[i]-u[i+2];
     u_new[i+1] = 1.0/2.0*(h2-msum);
   }
 }
 
-int main(int argc,char* argv[])
-{
+int main(int argc,char* argv[]) {
 
   /* compute time elapsed. The function is taken from the following URL:
      http://stackoverflow.com/questions/5248915/execution-time-of-c-program
@@ -83,7 +82,7 @@ int main(int argc,char* argv[])
     double f = h*h; //function f is 1
 
     int nprocs,rank;
-    unsigned int start,end;
+    unsigned int start;
     MPI_Init(&argc,&argv);
 
     //solve u. Use argv[2] to pick numerical algorithm.
@@ -98,6 +97,8 @@ int main(int argc,char* argv[])
 
     //use here to save the entries
     double *u = calloc(dim,sizeof(double));
+
+    //Begin computation
     int j;
     for (j=1;j<=iter;j++) { 
       MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
@@ -109,62 +110,64 @@ int main(int argc,char* argv[])
       int divlength = dim/nprocs;
 
       MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-      //indices for start and end of particular processor
+      /*Index for start of u corresponding to a particular processor. Since we are guaranteed
+        that the number of processors divides the number of partitions, we only need to record start*/
       start = rank*divlength;
-      end = (rank+1)*divlength-1;
 
       //vectors for computation. For safety of computation, all entries are initialized
       // to 0
       //double *p = calloc((divlength),sizeof(double));
       //double *d = calloc((divlength),sizeof(double));
-      double *ui = calloc((divlength+2),sizeof(double));
-      double *un = calloc((divlength+2),sizeof(double));
+      double *ui = calloc((divlength+2),sizeof(double));	//ith segment of u
+      double *uin = calloc((divlength+2),sizeof(double));	//new ith segment of u
+      double *un = calloc(dim,sizeof(double));			//new u. Records the segments so far.
 
       //set entries of the partition of u. Everything in between.
-      int i;
+      int i,k;
       for (i = 0;i<divlength;i++) ui[i+1] = u[start+i];
 
-      //set endpoints. 
+      //MPI send and receive u 
       int destination,origin, tag = 99;
-      double prev_endpoint,next_endpoint;
+
+      double *prev_u = calloc(dim,sizeof(double)); double *next_u=calloc(dim,sizeof(double));
       if (start == 0) {
         destination = nprocs == 1 ? 0:1;
         origin = nprocs - 1;
-        ui[divlength+1] = u[start+divlength];
-        prev_endpoint = ui[divlength];
-        MPI_Send(&prev_endpoint,1,MPI_DOUBLE,destination,tag,MPI_COMM_WORLD);
+        ui[divlength+1] = u[divlength];
+        jacobi(uin,ui,f,0,divlength,dim);
+        for (i = 0;i<divlength;i++) un[i] = uin[i+1];
+        for (k = 0;k<dim;k++) prev_u[k] = un[k];
+        MPI_Send(prev_u,dim,MPI_DOUBLE,destination,tag,MPI_COMM_WORLD);
 	//receive immediately in case we only have one interval. Serves no other purpose.
-        MPI_Recv(&next_endpoint,1,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
-      } else if (end == dim - 1) {
-        MPI_Recv(&next_endpoint,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
-        ui[0] = next_endpoint;
-        MPI_Send(&prev_endpoint,1,MPI_DOUBLE,0,tag,MPI_COMM_WORLD); //send something back to receive at rank 0
-      } else {
-        MPI_Recv(&next_endpoint,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
-        ui[0] = next_endpoint;
-        ui[divlength+1] = u[start+divlength];
-        prev_endpoint = ui[divlength];
-        MPI_Send(&prev_endpoint,1,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD);
-      }
-
-      jacobi(un,ui,f,start,divlength,dim);
-      //prod(p,un,start,divlength,dim);		//p = h^2*Au
-      //for(i=0;i<divlength;i++) d[i] = p[i] - f;	//d = p - h^2f
-
-      //feed resulting vector computation back into u
-      //note that endpoints of un are untouched.
-      for (i = 0;i<divlength;i++){
-        u[start+i] = un[i+1];
-      }
-
-      //print vector to check
-      if (rank == nprocs -1) {
-        int k;
-        for (k = 0;k<dim;k++){
-          printf("%lf ",u[k]);
-        }
+        MPI_Recv(next_u,dim,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
+        for (k = 0;k<dim;k++)u[k] = next_u[k];
+      } else if (start+divlength == dim) {
+        MPI_Recv(next_u,dim,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
+        ui[0] = u[start - 1];
+        jacobi(uin,ui,f,start,divlength,dim);
+        for (i = 0;i<start;i++) un[i] = next_u[i];
+        for (i = 0;i<divlength;i++) un[start+i] = uin[i+1];
+        for (k = 0;k<dim;k++) u[k] = un[k];
+        //PRINT DEBUG: print vector to check
+        printf("Iter: %d\n",j);
+        for (k = 0;k<dim;k++) printf("%lf ",u[k]);
         printf("\n");
+        for (k = 0;k<dim;k++) prev_u[k] = u[k];
+        MPI_Send(prev_u,dim,MPI_DOUBLE,0,tag,MPI_COMM_WORLD); //send something back to receive at rank 0
+      } else {
+	//receive the previous computations packed into one vector for final processing.
+        MPI_Recv(next_u,dim,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
+        ui[0] = u[start - 1];
+        ui[divlength+1] = u[start+divlength];
+        jacobi(uin,ui,f,start,divlength,dim);
+        for (i = 0;i<start;i++) un[i] = next_u[i];
+        for (i = 0;i<divlength;i++) un[start+i] = uin[i+1];
+        for (k = 0;k<dim;k++) prev_u[k] = un[k];
+        MPI_Send(prev_u,dim,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD);
       }
+
+      //prod(p,un,start,divlength,dim);			//p = h^2*Au
+      //for(i=0;i<divlength;i++) d[i] = p[i] - f;	//d = p - h^2f
       //double message_in,sum;
 
       //pass messages
@@ -180,12 +183,14 @@ int main(int argc,char* argv[])
       //free(d);
       free(ui);
       free(un);
+      free(prev_u);
+      free(next_u);
       }
-    free(u);
 
     //end time
     MPI_Finalize();
 
+    free(u);
     if (rank == nprocs - 1) {
       gettimeofday(&t2,NULL);
 
