@@ -12,6 +12,6 @@ Time elapsed for 200 procs, 1001 partitions: 11.880743 sec.
 Contrary to claims of independence of p for N large, time seems to increase dramatically for p large.
 This may, however, be due to the fact that the program was run on a computer with two processors instead of the Stampede system.
 Alternatively, my jacobi_mpi.c may not have been programmed to specifications, despite using mpi commands.
+The same results hold for crunchy1 on cims.
 
-A parallel version of the Gauss-Seidel smoother would be more difficult due to the need to continuously update the given vector during processing.
-
+A parallel version of the Gauss-Seidel smoother would be more difficult due to the need to continuously update the given vector u during processing. 
