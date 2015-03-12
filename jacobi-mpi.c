@@ -63,8 +63,8 @@ int main(int argc,char* argv[]) {
       if (argc == 1) {
         /*Default value for dim:
          minimum case where the start point does not equal the endpoint
-         but since this is a very imprecise partition, this is highly
-         undesirable.*/
+         but since this is a very imprecise partition, this is not
+         desirable.*/
         printf("No partition amount specified. Partitioning into 2 intervals.\n");
         printf("No iteration amount specified. Jacobi algorithm will iterate 10 times.\n");
         dim = 2;
@@ -120,52 +120,64 @@ int main(int argc,char* argv[]) {
       //double *d = calloc((divlength),sizeof(double));
       double *ui = calloc((divlength+2),sizeof(double));	//ith segment of u
       double *uin = calloc((divlength+2),sizeof(double));	//new ith segment of u
-      double *un = calloc(dim,sizeof(double));			//new u. Records the segments so far.
 
       //set entries of the partition of u. Everything in between.
       int i,k;
       for (i = 0;i<divlength;i++) ui[i+1] = u[start+i];
 
       //MPI send and receive u 
-      int destination,origin, tag = 99;
+      int dest, tag = 99;
 
-      double *prev_u = calloc(dim,sizeof(double)); double *next_u=calloc(dim,sizeof(double));
-      if (start == 0) {
-        destination = nprocs == 1 ? 0:1;
-        origin = nprocs - 1;
-        ui[divlength+1] = u[divlength];
+      double prev_endpt; double next_endpt;
+      double *part_in = calloc((divlength+2),sizeof(double));
+      double *part_out = calloc((divlength+2),sizeof(double));
+      if (rank == 0) {
+        dest = nprocs == 1 ? 0:1;
+        prev_endpt = ui[divlength];
+        MPI_Send(&prev_endpt,1,MPI_DOUBLE,dest,tag,MPI_COMM_WORLD);
+        MPI_Recv(&next_endpt,1,MPI_DOUBLE,dest,tag,MPI_COMM_WORLD,&status);
+        ui[divlength+1] = next_endpt;
         jacobi(uin,ui,f,0,divlength,dim);
-        for (i = 0;i<divlength;i++) un[i] = uin[i+1];
-        for (k = 0;k<dim;k++) prev_u[k] = un[k];
-        MPI_Send(prev_u,dim,MPI_DOUBLE,destination,tag,MPI_COMM_WORLD);
-	//receive immediately in case we only have one interval. Serves no other purpose.
-        MPI_Recv(next_u,dim,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
-        for (k = 0;k<dim;k++)u[k] = next_u[k];
-      } else if (start+divlength == dim) {
-        MPI_Recv(next_u,dim,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
-        ui[0] = u[start - 1];
-        jacobi(uin,ui,f,start,divlength,dim);
-        for (i = 0;i<start;i++) un[i] = next_u[i];
-        for (i = 0;i<divlength;i++) un[start+i] = uin[i+1];
-        for (k = 0;k<dim;k++) u[k] = un[k];
-        //PRINT DEBUG: print vector to check
-        //printf("Iter: %d\n",j);
-        //for (k = 0;k<dim;k++) printf("%lf ",u[k]);
-        //printf("\n");
 
-        for (k = 0;k<dim;k++) prev_u[k] = u[k];
-        MPI_Send(prev_u,dim,MPI_DOUBLE,0,tag,MPI_COMM_WORLD); //send something back to receive at rank 0
+	//EDIT: send uin to rank nprocs - 1
+        for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
+        MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
+      } else if (rank == nprocs - 1) {
+	prev_endpt = ui[1];
+        MPI_Recv(&next_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
+        MPI_Send(&prev_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD);
+        for (k = nprocs-2;k>=0;k--) {
+	  //PRINT DEBUG
+          printf("%d\n",k);
+	  MPI_Recv(part_in,divlength+2,MPI_DOUBLE,k,tag,MPI_COMM_WORLD,&status);
+          for (i = 0;i<divlength;i++) u[k*divlength+i] = part_in[i+1];
+        }
+        ui[0] = next_endpt;
+        jacobi(uin,ui,f,start,divlength,dim);
+
+	//EDIT: send uin to rank nprocs - 1
+        for (i = 0;i<divlength;i++) u[start+i] = uin[i+1];
+
+        //PRINT DEBUG: print vector to check
+        printf("Iter: %d\n",j);
+        for (k = 0;k<dim;k++) printf("%lf ",u[k]);
+        printf("\n");
       } else {
 	//receive the previous computations packed into one vector for final processing.
-        MPI_Recv(next_u,dim,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
-        ui[0] = u[start - 1];
-        ui[divlength+1] = u[start+divlength];
+        MPI_Recv(&next_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
+        ui[0] = next_endpt;
+        prev_endpt = ui[1]; 
+        MPI_Send(&prev_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD);
+        prev_endpt = ui[divlength];
+        MPI_Send(&prev_endpt,1,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD);
+        MPI_Recv(&next_endpt,1,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD,&status);
+        ui[divlength+1] = next_endpt; 
         jacobi(uin,ui,f,start,divlength,dim);
 
-        for (i = 0;i<start;i++) un[i] = next_u[i];
-        for (i = 0;i<divlength;i++) un[start+i] = uin[i+1];
-        for (k = 0;k<dim;k++) prev_u[k] = un[k];
-        MPI_Send(prev_u,dim,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD);
+	//EDIT: send uin to rank nprocs - 1
+        //part_out = uin;
+        for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
+        MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
       }
 
       //prod(p,un,start,divlength,dim);			//p = h^2*Au
@@ -184,9 +196,9 @@ int main(int argc,char* argv[]) {
       //free(p);
       //free(d);
       free(ui);
-      free(un);
-      free(prev_u);
-      free(next_u);
+      free(uin);
+      free(part_out);
+      free(part_in);
       }
 
     //end time
