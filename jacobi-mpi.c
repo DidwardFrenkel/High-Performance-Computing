@@ -52,11 +52,11 @@ int main(int argc,char* argv[]) {
   /* compute time elapsed. The function is taken from the following URL:
      http://stackoverflow.com/questions/5248915/execution-time-of-c-program
   */
-  struct timeval t1,t2;
+  //struct timeval t1,t2;
   //dimension of matrix and vector. Matrix is square matrix
   
     //start time
-    gettimeofday(&t1,NULL);
+    //gettimeofday(&t1,NULL);
     MPI_Status status;
 
       unsigned int dim,iter; //number of iterations
@@ -133,38 +133,61 @@ int main(int argc,char* argv[]) {
       double *part_out = calloc((divlength+2),sizeof(double));
       if (rank == 0) {
         dest = nprocs == 1 ? 0:1;
+	if (j > 1) {
+	//EDIT: receive the vector partition back from nprocs - 1 if j > 1 
+          MPI_Recv(part_in,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
+          for (i = 0;i<divlength+2;i++) ui[i] = part_in[i];
+        }
         prev_endpt = ui[divlength];
         MPI_Send(&prev_endpt,1,MPI_DOUBLE,dest,tag,MPI_COMM_WORLD);
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,dest,tag,MPI_COMM_WORLD,&status);
         ui[divlength+1] = next_endpt;
         jacobi(uin,ui,f,0,divlength,dim);
 
-	//EDIT: send uin to rank nprocs - 1
         for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
         MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
       } else if (rank == nprocs - 1) {
-	prev_endpt = ui[1];
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
+        ui[0] = next_endpt;
+	prev_endpt = ui[1];
         MPI_Send(&prev_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD);
+        k = nprocs - 2;
         for (k = nprocs-2;k>=0;k--) {
-	  //PRINT DEBUG
-          printf("%d\n",k);
 	  MPI_Recv(part_in,divlength+2,MPI_DOUBLE,k,tag,MPI_COMM_WORLD,&status);
           for (i = 0;i<divlength;i++) u[k*divlength+i] = part_in[i+1];
         }
-        ui[0] = next_endpt;
         jacobi(uin,ui,f,start,divlength,dim);
 
-	//EDIT: send uin to rank nprocs - 1
+	//update last part of vector
         for (i = 0;i<divlength;i++) u[start+i] = uin[i+1];
 
-        //PRINT DEBUG: print vector to check
+        //print vector in question to check
         printf("Iter: %d\n",j);
         for (k = 0;k<dim;k++) printf("%lf ",u[k]);
         printf("\n");
+
+	if (j < iter) {
+	//EDIT: send all pieces back to other procs if j < iter
+          for (k = 0;k<nprocs-1;k++) {
+            for (i = 0;i<divlength+2;i++) part_in[i] = u[k*divlength+i];
+	/*PRINT DEBUG
+        printf("Iter: %d, Sending part\n",j);
+        int l;
+        for (l = 0;l<divlength;l++) printf("%lf ",part_in[l]);
+        printf("\n");*/
+	    MPI_Send(part_in,divlength+2,MPI_DOUBLE,k,tag,MPI_COMM_WORLD);
+          }
+        }
       } else {
 	//receive the previous computations packed into one vector for final processing.
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
+	//EDIT: receive the vector partition back from nprocs - 1 and get entries for u. 
+	if (j > 1) {
+	//EDIT: receive the vector partition back from nprocs - 1 if j > 1 
+          MPI_Recv(part_in,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
+          for (i = 0;i<divlength+2;i++) ui[i] = part_in[i];
+        }
+
         ui[0] = next_endpt;
         prev_endpt = ui[1]; 
         MPI_Send(&prev_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD);
@@ -174,7 +197,6 @@ int main(int argc,char* argv[]) {
         ui[divlength+1] = next_endpt; 
         jacobi(uin,ui,f,start,divlength,dim);
 
-	//EDIT: send uin to rank nprocs - 1
         //part_out = uin;
         for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
         MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
@@ -206,9 +228,12 @@ int main(int argc,char* argv[]) {
 
     free(u);
     if (rank == nprocs - 1) {
-      gettimeofday(&t2,NULL);
+      //gettimeofday(&t2,NULL);
+      //int k;
+      //for (k = 0;k<dim;k++) printf("%lf ",u[k]);
+      //printf("\n");
 
-      printf("Time elapsed for %d procs, %d partitions: %lf sec.\n", nprocs,dim + 1,((double)(t2.tv_usec-t1.tv_usec)/1000000 + (double)(t2.tv_sec - t1.tv_sec)));
+      //printf("Time elapsed for %d procs, %d partitions: %lf sec.\n", nprocs,dim + 1,((double)(t2.tv_usec-t1.tv_usec)/1000000 + (double)(t2.tv_sec - t1.tv_sec)));
     }
 
   return 0;
