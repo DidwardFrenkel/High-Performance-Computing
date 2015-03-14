@@ -134,14 +134,20 @@ int main(int argc,char* argv[]) {
       if (rank == 0) {
         dest = nprocs == 1 ? 0:1;
 	if (j > 1) {
-	//EDIT: receive the vector partition back from nprocs - 1 if j > 1 
+	//receive the vector partition back from nprocs - 1 if j > 1 
           MPI_Recv(part_in,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
           for (i = 0;i<divlength+2;i++) ui[i] = part_in[i];
-        }
+	  //sends endpoint back to nprocs - 1
+          if (nprocs == 2) {
+	    prev_endpt = ui[divlength];
+	    MPI_Send(&prev_endpt,1,MPI_DOUBLE,1,tag,MPI_COMM_WORLD);
+          } 
+        } else if (j == 1) {
         prev_endpt = ui[divlength];
         MPI_Send(&prev_endpt,1,MPI_DOUBLE,dest,tag,MPI_COMM_WORLD);
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,dest,tag,MPI_COMM_WORLD,&status);
         ui[divlength+1] = next_endpt;
+        }
         jacobi(uin,ui,f,0,divlength,dim);
 
         for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
@@ -149,9 +155,11 @@ int main(int argc,char* argv[]) {
       } else if (rank == nprocs - 1) {
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpt;
-	prev_endpt = ui[1];
-        MPI_Send(&prev_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD);
-        k = nprocs - 2;
+        //send back endpoint if first iteration.
+        if (j == 1) {
+	  prev_endpt = ui[1];
+          MPI_Send(&prev_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD);
+	}
         for (k = nprocs-2;k>=0;k--) {
 	  MPI_Recv(part_in,divlength+2,MPI_DOUBLE,k,tag,MPI_COMM_WORLD,&status);
           for (i = 0;i<divlength;i++) u[k*divlength+i] = part_in[i+1];
@@ -167,34 +175,35 @@ int main(int argc,char* argv[]) {
         printf("\n");
 
 	if (j < iter) {
-	//EDIT: send all pieces back to other procs if j < iter
+	//send all other pieces back to other procs if j < iter
           for (k = 0;k<nprocs-1;k++) {
-            for (i = 0;i<divlength+2;i++) part_in[i] = u[k*divlength+i];
-	/*PRINT DEBUG
-        printf("Iter: %d, Sending part\n",j);
-        int l;
-        for (l = 0;l<divlength;l++) printf("%lf ",part_in[l]);
-        printf("\n");*/
+            if (k == 0) for (i = 0;i<divlength+1;i++) part_in[i+1] = u[i];
+	    else for (i = 0;i<divlength+2;i++) part_in[i] = u[k*divlength+i-1];
 	    MPI_Send(part_in,divlength+2,MPI_DOUBLE,k,tag,MPI_COMM_WORLD);
           }
         }
       } else {
 	//receive the previous computations packed into one vector for final processing.
-        MPI_Recv(&next_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
-	//EDIT: receive the vector partition back from nprocs - 1 and get entries for u. 
+	//receive the vector partition back from nprocs - 1 and get entries for u. 
 	if (j > 1) {
-	//EDIT: receive the vector partition back from nprocs - 1 if j > 1 
+	//receive the vector partition back from nprocs - 1 if j > 1 
           MPI_Recv(part_in,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD,&status);
           for (i = 0;i<divlength+2;i++) ui[i] = part_in[i];
-        }
-
+	  //sends endpoint back to nprocs - 1
+          if (rank == nprocs - 2) {
+	    prev_endpt = ui[divlength];
+	    MPI_Send(&prev_endpt,1,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
+          } 
+        } else if (j == 1) {
+        MPI_Recv(&next_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpt;
         prev_endpt = ui[1]; 
         MPI_Send(&prev_endpt,1,MPI_DOUBLE,rank-1,tag,MPI_COMM_WORLD);
         prev_endpt = ui[divlength];
         MPI_Send(&prev_endpt,1,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD);
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,rank+1,tag,MPI_COMM_WORLD,&status);
-        ui[divlength+1] = next_endpt; 
+        ui[divlength+1] = next_endpt;
+	}
         jacobi(uin,ui,f,start,divlength,dim);
 
         //part_out = uin;
