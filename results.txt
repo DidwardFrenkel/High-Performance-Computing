@@ -5,13 +5,18 @@ Latency: 0.000030 s. for 10 procs, N = 1000
 Bandwidth: 0.588916 MB/s for 10 procs, N = 50
 
 Problem 2:
-All results below were done for 10 Jacobi iterations.
-Time elapsed for 2 procs, 1001 partitions: 0.053142 sec.
-Time elapsed for 20 procs, 1001 partitions: 0.197091 sec.
-Time elapsed for 200 procs, 1001 partitions: 11.880743 sec.
-Contrary to claims of independence of p for N large, time seems to increase dramatically for p large.
-This may, however, be due to the fact that the program was run on a computer with two processors instead of the Stampede system.
-Alternatively, my jacobi_mpi.c may not have been programmed to specifications, despite using mpi commands.
-The same results hold for crunchy1 on cims.
+All results below were done for 10 Jacobi iterations on N = 20:
+p = 1
+0.002265 0.006384 0.008844 0.010202 0.010871 0.011174 0.011287 0.011327 0.011336 0.011338 0.011338 0.011336 0.011329 0.011296 0.011214 0.010984 0.010505 0.009513 0.007742 0.004726 
+p = 2
+0.002265 0.006384 0.008844 0.010202 0.010871 0.011174 0.011287 0.011327 0.011336 0.011338 0.011338 0.011336 0.011329 0.011296 0.011214 0.010984 0.010505 0.009513 0.007742 0.004726 
+p = 4
+0.002265 0.006384 0.008844 0.010202 0.010871 0.011174 0.011287 0.011327 0.011336 0.011338 0.011338 0.011336 0.011329 0.011296 0.011214 0.010984 0.010505 0.009513 0.007742 0.004726 
+p = 5
+0.002265 0.006384 0.008844 0.010202 0.010871 0.011174 0.011287 0.011327 0.011336 0.011338 0.011338 0.011336 0.011329 0.011296 0.011214 0.010984 0.010505 0.009513 0.007742 0.004726 
+p = 10
+0.002265 0.006384 0.008844 0.010202 0.010871 0.011174 0.011287 0.011327 0.011336 0.011338 0.011338 0.011336 0.011329 0.011296 0.011214 0.010984 0.010505 0.009513 0.007742 0.004726 
+p = 20
+0.002265 0.006384 0.008844 0.010202 0.010871 0.011174 0.011287 0.011327 0.011336 0.011338 0.011338 0.011336 0.011329 0.011296 0.011214 0.010984 0.010505 0.009513 0.007742 0.004726 
 
 A parallel version of the Gauss-Seidel smoother would be more difficult due to the need to continuously update the given vector u during processing. 
