@@ -4,10 +4,6 @@
 #include <math.h>
 #include <sys/time.h>
 
-/* customized vector difference function. In this case, b is
-   guaranteed to be constant.
-*/
-
 /* customized matrix-vector product to compute for specific A
    We want to solve for h^2*Au=h^2, so h^2*A has integral entries
 */
@@ -150,8 +146,15 @@ int main(int argc,char* argv[]) {
         }
         jacobi(uin,ui,f,0,divlength,dim);
 
-        for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
-        MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
+	if (nprocs == 1 && j == iter){
+	  for (k = 0;k<dim;k++) printf("%lf ",uin[k+1]);
+          printf("\n");
+	}
+
+	if (iter > 1) {
+          for (i = 0;i<divlength+2;i++) part_out[i] = uin[i];
+          MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
+        }
       } else if (rank == nprocs - 1) {
         MPI_Recv(&next_endpt,1,MPI_DOUBLE,nprocs-2,tag,MPI_COMM_WORLD,&status);
         ui[0] = next_endpt;
@@ -169,10 +172,17 @@ int main(int argc,char* argv[]) {
 	//update last part of vector
         for (i = 0;i<divlength;i++) u[start+i] = uin[i+1];
 
-        //print vector in question to check
-        printf("Iter: %d\n",j);
+        //print u after every iteration to check for consistency on processors
+	// to use this, simply remove the comment markers on the following 3 lines
+        /*printf("Iter: %d\n",j);
         for (k = 0;k<dim;k++) printf("%lf ",u[k]);
-        printf("\n");
+        printf("\n");*/
+
+	//print final vector after final iteration has been reached.
+        if (j == iter) {
+	  for (k = 0;k<dim;k++) printf("%lf ",u[k]);
+          printf("\n");
+	}
 
 	if (j < iter) {
 	//send all other pieces back to other procs if j < iter
@@ -211,6 +221,7 @@ int main(int argc,char* argv[]) {
         MPI_Send(part_out,divlength+2,MPI_DOUBLE,nprocs-1,tag,MPI_COMM_WORLD);
       }
 
+      //calculations used to compute residue. Not complete in this version.
       //prod(p,un,start,divlength,dim);			//p = h^2*Au
       //for(i=0;i<divlength;i++) d[i] = p[i] - f;	//d = p - h^2f
       //double message_in,sum;
@@ -236,14 +247,16 @@ int main(int argc,char* argv[]) {
     MPI_Finalize();
 
     free(u);
-    if (rank == nprocs - 1) {
-      //gettimeofday(&t2,NULL);
-      //int k;
-      //for (k = 0;k<dim;k++) printf("%lf ",u[k]);
-      //printf("\n");
 
-      //printf("Time elapsed for %d procs, %d partitions: %lf sec.\n", nprocs,dim + 1,((double)(t2.tv_usec-t1.tv_usec)/1000000 + (double)(t2.tv_sec - t1.tv_sec)));
-    }
+    //Time elapsed. To use, simply uncomment the following code
+    /*if (rank == nprocs - 1) {
+      gettimeofday(&t2,NULL);
+      int k;
+      for (k = 0;k<dim;k++) printf("%lf ",u[k]);
+      printf("\n");
+
+      printf("Time elapsed for %d procs, %d partitions: %lf sec.\n", nprocs,dim + 1,((double)(t2.tv_usec-t1.tv_usec)/1000000 + (double)(t2.tv_sec - t1.tv_sec)));
+    }*/
 
   return 0;
 }
