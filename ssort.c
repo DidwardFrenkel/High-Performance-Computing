@@ -32,7 +32,10 @@ int main( int argc, char *argv[])
 
   /* Number of random numbers per processor (this should be increased
    * for actual tests or could be made a passed in through the command line */
+  //for local desktop computer experiments.
   N = 100;
+  //for Stampede
+  //N = 10000
 
   vec = calloc(N, sizeof(int));
   /* seed random number generator differently on every core */
@@ -150,7 +153,8 @@ int main( int argc, char *argv[])
   /* local sort */
   qsort(vec_in,size_in,sizeof(int),compare);
 
-  /* every processor writes its result to a file */
+  //Dummy code. Uncomment the top and bottom to bring every part back to root.
+/*
   int* final_vec = calloc(P*N,sizeof(int));
   //MPI_Gather all sizes into array of final_sizes
   int* final_sizes = calloc(P,sizeof(int));
@@ -168,17 +172,22 @@ int main( int argc, char *argv[])
   free(final_sizes);
   free(final_disp);
 
-  if (rank == 0) {
+  MPI_Bcast(final_vec,N*P,MPI_INT,0,MPI_COMM_WORLD);
+*/
+
+  /* every processor writes its result to a file */
+  {
     FILE* sorted_vec = NULL;
-    char* filename = "sorted_vec.txt";
+    char filename[256];
+    snprintf(filename,256,"sorted_vec_%d.txt",rank);
     sorted_vec = fopen(filename,"w+");
     if (NULL == sorted_vec) {
       printf("Error opening file\n");
       return -1;
     }
-    //fprintf the elements of the vector for each row.
-    for (i = 0;i<P*N;i++) {
-      fprintf(sorted_vec,"%d\n",final_vec[i]);
+    //fprintf the elements of the vector for each row for easier confirmation of order.
+    for (i = 0;i<size_in;i++) {
+      fprintf(sorted_vec,"%d\n",vec_in[i]);
     }
 
     fclose(sorted_vec);
