@@ -153,28 +153,6 @@ int main( int argc, char *argv[])
   /* local sort */
   qsort(vec_in,size_in,sizeof(int),compare);
 
-  //Dummy code. Uncomment the top and bottom to bring every part back to root.
-/*
-  int* final_vec = calloc(P*N,sizeof(int));
-  //MPI_Gather all sizes into array of final_sizes
-  int* final_sizes = calloc(P,sizeof(int));
-  int* final_disp = calloc(P,sizeof(int));
-  MPI_Gather(&size_in,1,MPI_INT,final_sizes,1,MPI_INT,0,MPI_COMM_WORLD);
-  //Broadcast final sizes to all ranks
-  MPI_Bcast(final_sizes,P,MPI_INT,0,MPI_COMM_WORLD);
-  //compute displacement of final vector
-  final_disp[0] = 0;
-  for (i=1;i<P;i++) {
-    final_disp[i] = final_disp[i-1] + final_sizes[i-1];
-  }
-  //MPI_Gatherv everything into one vector at root
-  MPI_Gatherv(vec_in,size_in,MPI_INT,final_vec,final_sizes,final_disp,MPI_INT,0,MPI_COMM_WORLD);
-  free(final_sizes);
-  free(final_disp);
-
-  MPI_Bcast(final_vec,N*P,MPI_INT,0,MPI_COMM_WORLD);
-*/
-
   /* every processor writes its result to a file */
   {
     FILE* sorted_vec = NULL;
