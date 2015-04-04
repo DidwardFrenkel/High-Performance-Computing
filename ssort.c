@@ -39,7 +39,7 @@ int main( int argc, char *argv[])
 
   vec = calloc(N, sizeof(int));
   /* seed random number generator differently on every core */
-  srand48((unsigned int) rank);
+  srand((unsigned int)(rank + 393919));
 
   /* fill vector with random integers */
   for (i = 0; i < N; ++i) {
