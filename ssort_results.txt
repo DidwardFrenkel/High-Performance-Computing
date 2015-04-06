@@ -1,2 +1,6 @@
-The following results consist of runtimes for ssort run on P cores on Stampede for vectors at each process of length N = 10000.
-P = 64, run time = 17 s. 
+The following results consist of runtimes for ssort run on P cores on Stampede for vectors at each process of length N = 100,000.
+P = 64, run time = 20 s.
+P = 80, run time = 20 s.
+P = 96, run time = 19 s.
+P = 112, run time = 20 s.
+P = 128, run time = 20 s.
