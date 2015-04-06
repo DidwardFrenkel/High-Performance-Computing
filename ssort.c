@@ -35,7 +35,7 @@ int main( int argc, char *argv[])
   //for local desktop computer experiments.
   N = 100;
   //for Stampede
-  //N = 10000
+  //N = 10000;
 
   vec = calloc(N, sizeof(int));
   /* seed random number generator differently on every core */
@@ -176,6 +176,8 @@ int main( int argc, char *argv[])
   free(vec_in);
   free(sizes_out);
   free(sizes_in);
+  free(displ_out);
+  free(displ_in);
   MPI_Finalize();
   return 0;
 }
