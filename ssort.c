@@ -69,21 +69,13 @@ int main( int argc, char *argv[])
 
   /* every processor communicates the selected entries
    * to the root processor rank = 0.*/
-  MPI_Send(s_entries,P-1,MPI_INT,0,tag,MPI_COMM_WORLD);
-  free(s_entries);
+  int* splitters = calloc(P*(P-1),sizeof(int));
+  MPI_Gather(s_entries,P-1,MPI_INT,splitters,P-1,MPI_INT,0,MPI_COMM_WORLD);
 
   int* final_splitters = calloc(P-1,sizeof(int));
+  free(s_entries);
   /* root processor does a sort, determinates splitters and broadcasts them */
   if (rank == 0) {
-    int* splitters = calloc(P*(P-1),sizeof(int));
-    int* message_in = calloc(P-1,sizeof(int));
-    for (i=P-1;i>=0;i--){
-      MPI_Recv(message_in,P-1,MPI_INT,i,tag,MPI_COMM_WORLD,&status);
-      int j;
-      for (j = 0;j<P-1;j++){
-        splitters[i*(P-1)+j] = message_in[j];
-      }
-    }
     qsort(splitters,P*(P-1),sizeof(int),compare);
 
     //get the final splitters by picking the middle P-1 ints from the possible.
@@ -92,7 +84,6 @@ int main( int argc, char *argv[])
       final_splitters[i-1] = splitters[i*P-1 - P/2];
     }
     free(splitters);
-    free(message_in);
     /* every processor uses the obtained splitters to decide to send
      * which integers to whom */
     for (i=1;i<P;i++){
